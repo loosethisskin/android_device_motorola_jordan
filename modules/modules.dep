@@ -35,4 +35,7 @@ cpufreq_stats.ko:
 cpufreq_smartass.ko: symsearch.ko
 cpufreq_interactive.ko: symsearch.ko cpufreq_stats.ko
 cpufreq_conservative.ko:
+xt_multiport.ko:
+camise.ko:
+camera.ko: symsearch.ko camise.ko
 
