@@ -7,7 +7,6 @@ export PATH=/sbin:/system/xbin:/system/bin
 CONFIG_FILE="/system/bootmenu/config/overclock.conf"
 MODULE_DIR="/system/lib/modules"
 SCALING_GOVERNOR="/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"
-ASKED_MODE=$1
 
 #############################################################
 # Parameters Load
@@ -20,9 +19,11 @@ ASKED_MODE=$1
 # clk1 300
 # clk2 600
 # clk3 1000
+# clk4 1100
 # vsel1 30
 # vsel2 46
 # vsel3 58
+# vsel4 62
 # con_up_threshold 80
 # con_down_threshold 20
 # con_freq_step 5
@@ -43,26 +44,6 @@ param_load()
   for CONF in $(sed -e 's/^\([^ ]*\) \(.*\)/\1=\2/g' $CONFIG_FILE); do
     export $CONF
   done
-}
-
-param_safe()
-{
-  # for bootmenu operations
-  # enable ondemand profile
-  # which is in kernel
-  export enable=1
-  export load_all=0
-  export clk1=300
-  export clk2=600
-  export clk3=800
-  export clk4=1000
-  export vsel1=30
-  export vsel2=46
-  export vsel3=52
-  export vsel4=58
-  export scaling=2
-  export ond_up_threshold=86
-  export ond_sampling_rate=50000
 }
 
 #############################################################
@@ -166,34 +147,55 @@ set_scaling()
 
 set_overclock_table()
 {
-  echo "$vsel3" > /proc/overclock/max_vsel
-  echo "${clk3}000" > /proc/overclock/max_rate
-  echo "3 ${clk3}000000 $vsel3" > /proc/overclock/mpu_opps
-  echo "2 ${clk2}000000 $vsel2" > /proc/overclock/mpu_opps
-  echo "1 ${clk1}000000 $vsel1" > /proc/overclock/mpu_opps
-  echo "0 ${clk3}000" > /proc/overclock/freq_table
-  echo "1 ${clk2}000" > /proc/overclock/freq_table
-  echo "2 ${clk1}000" > /proc/overclock/freq_table
+  saf_count=`cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_available_frequencies | wc -w`
+
+  if [ $saf_count -gt 3 ]; then
+    echo "4 ${clk4}000000 $vsel4" > /proc/overclock/mpu_opps
+    echo "3 ${clk3}000000 $vsel3" > /proc/overclock/mpu_opps
+    echo "2 ${clk2}000000 $vsel2" > /proc/overclock/mpu_opps
+    echo "1 ${clk1}000000 $vsel1" > /proc/overclock/mpu_opps
+
+    echo "0 ${clk4}000" > /proc/overclock/freq_table
+    echo "1 ${clk3}000" > /proc/overclock/freq_table
+    echo "2 ${clk2}000" > /proc/overclock/freq_table
+    echo "3 ${clk1}000" > /proc/overclock/freq_table
+  else
+    echo "3 ${clk3}000000 $vsel3" > /proc/overclock/mpu_opps
+    echo "2 ${clk2}000000 $vsel2" > /proc/overclock/mpu_opps
+    echo "1 ${clk1}000000 $vsel1" > /proc/overclock/mpu_opps
+
+    echo "0 ${clk3}000" > /proc/overclock/freq_table
+    echo "1 ${clk2}000" > /proc/overclock/freq_table
+    echo "2 ${clk1}000" > /proc/overclock/freq_table
+  fi
+}
+
+#############################################################
+# Set Scaling Range
+#############################################################
+
+set_scaling_range()
+{
+  echo "${clk1}000" > $SCALING_MIN
+
+  if [ $saf_count -gt 3 ]; then
+    echo "${clk4}000" > $SCALING_MAX
+  else
+    echo "${clk3}000" > $SCALING_MAX
+  fi
 }
 
 #############################################################
 # Main Scrpit
 #############################################################
 
-if [ "$ASKED_MODE" = "safe" ]; then
-  param_safe
-else
-  if [ -e $CONFIG_FILE ]; then
-    param_load
-  else
-    param_safe
+if [ -e $CONFIG_FILE ]; then
+  param_load
+  if [ $enable -eq 1 ]; then
+    get_address
+    install_module
+    set_overclock_table
+    set_scaling_range
+    set_scaling
   fi
 fi
-
-if [ $enable -eq 1 ]; then
-  get_address
-  install_module
-  set_scaling
-  set_overclock_table
-fi
-
